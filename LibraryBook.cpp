@@ -1,15 +1,29 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <fstream>   // Для работы с файлами
+#include <ctime>     // Для получения времени
+#include <iomanip>   // Для форматирования времени
 
 using namespace std;
 
+// Функция для получения текущего времени в формате [YYYY-MM-DD HH:MM:SS]
+string get_current_time() {
+    time_t now = time(0);
+    tm* local_time = localtime(&now);
+    char buffer[100];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", local_time);
+    return string(buffer);
+}
+
+// Класс "Книга"
 class Book {
 private:
     string title;
     string author;
     int year;
     bool is_borrowed;
+
 public:
     Book(string title, string author, int year) 
         : title(title), author(author), year(year), is_borrowed(false) {}
@@ -30,20 +44,54 @@ public:
     }
 };
 
+// Класс "Библиотека" с логированием
 class Library {
 private:
     vector<Book> books;
+    ofstream log_file; // Файл для логов
+
+    // Метод для записи в лог
+    void write_log(const string& message) {
+        if(log_file.is_open()) {
+            log_file << "[" << get_current_time() << "] " << message << endl;
+        }
+        // Также выводим в консоль для удобства
+        cout << "[" << get_current_time() << "] LOG: " << message << endl;
+    }
+
 public:
+    // Конструктор - открываем файл лога
+    Library() {
+        log_file.open("library.log", ios::app); // Открываем в режиме добавления
+        if(log_file.is_open()) {
+            write_log("Library system started");
+        } else {
+            cerr << "Warning: Could not open log file!" << endl;
+        }
+    }
+
+    // Деструктор - закрываем файл лога
+    ~Library() {
+        if(log_file.is_open()) {
+            write_log("Library system shutdown");
+            log_file.close();
+        }
+    }
+
     bool add_book(const Book& book) {
         for(const auto& elem : books) {
             if(elem == book) {
-                cerr << "Error: Book '" << book.get_title() 
-                     << "' already exists in the library." << endl;
+                string error_msg = "ERROR: Book '" + book.get_title() + 
+                                 "' already exists in the library.";
+                write_log(error_msg);
+                cerr << error_msg << endl;
                 return false;
             }
         }
         books.push_back(book);
-        cout << "Book '" << book.get_title() << "' added successfully." << endl;
+        string success_msg = "Book '" + book.get_title() + "' added successfully.";
+        write_log(success_msg);
+        cout << success_msg << endl;
         return true;
     }
 
@@ -52,14 +100,20 @@ public:
             if(elem.get_title() == title) {
                 if(!elem.get_is_borrowed()) {
                     elem.borrow();
-                    cout << "Book '" << title << "' borrowed successfully." << endl;
+                    string msg = "Book '" + title + "' borrowed successfully.";
+                    write_log(msg);
+                    cout << msg << endl;
                     return true;
                 }
-                cerr << "Error: Book '" << title << "' is already borrowed." << endl;
+                string error_msg = "ERROR: Book '" + title + "' is already borrowed.";
+                write_log(error_msg);
+                cerr << error_msg << endl;
                 return false;
             }
         }
-        cerr << "Error: Book '" << title << "' not found." << endl;
+        string error_msg = "ERROR: Book '" + title + "' not found.";
+        write_log(error_msg);
+        cerr << error_msg << endl;
         return false;
     }
 
@@ -68,14 +122,20 @@ public:
             if(elem.get_title() == title) {
                 if(elem.get_is_borrowed()) {
                     elem.return_book();
-                    cout << "Book '" << title << "' returned successfully." << endl;
+                    string msg = "Book '" + title + "' returned successfully.";
+                    write_log(msg);
+                    cout << msg << endl;
                     return true;
                 }
-                cerr << "Error: Book '" << title << "' was not borrowed." << endl;
+                string error_msg = "ERROR: Book '" + title + "' was not borrowed.";
+                write_log(error_msg);
+                cerr << error_msg << endl;
                 return false;
             }
         }
-        cerr << "Error: Book '" << title << "' not found." << endl;
+        string error_msg = "ERROR: Book '" + title + "' not found.";
+        write_log(error_msg);
+        cerr << error_msg << endl;
         return false;
     }
 
@@ -99,6 +159,8 @@ public:
                 result.push_back(elem);
             }
         }
+        string msg = "Found " + to_string(result.size()) + " books by author '" + author + "'";
+        const_cast<Library*>(this)->write_log(msg); // Небольшой хак для записи из const метода
         return result;
     }
 
@@ -109,6 +171,8 @@ public:
                 result.push_back(elem);
             }
         }
+        string msg = "Found " + to_string(result.size()) + " books with title '" + title + "'";
+        const_cast<Library*>(this)->write_log(msg);
         return result;
     }
 
@@ -116,16 +180,22 @@ public:
         for(auto it = books.begin(); it != books.end(); ++it) {
             if(it->get_title() == title && it->get_author() == author) {
                 if(it->get_is_borrowed()) {
-                    cerr << "Error: Cannot delete borrowed book '" << title 
-                         << "' by '" << author << "'." << endl;
+                    string error_msg = "ERROR: Cannot delete borrowed book '" + title 
+                                     + "' by '" + author + "'.";
+                    write_log(error_msg);
+                    cerr << error_msg << endl;
                     return false;
                 }
                 books.erase(it);
-                cout << "Book '" << title << "' by '" << author << "' deleted successfully." << endl;
+                string msg = "Book '" + title + "' by '" + author + "' deleted successfully.";
+                write_log(msg);
+                cout << msg << endl;
                 return true;
             }
         }
-        cerr << "Error: Book '" << title << "' by '" << author << "' not found." << endl;
+        string error_msg = "ERROR: Book '" + title + "' by '" + author + "' not found.";
+        write_log(error_msg);
+        cerr << error_msg << endl;
         return false;
     }
 
@@ -139,11 +209,17 @@ public:
         }
         cout << "++===++ Borrowed books: " << borrowed << endl;
         cout << "++===++ Available books: " << books.size() - borrowed << endl;
+        
+        string msg = "Statistics: Total=" + to_string(books.size()) + 
+                    ", Borrowed=" + to_string(borrowed) + 
+                    ", Available=" + to_string(books.size() - borrowed);
+        const_cast<Library*>(this)->write_log(msg);
     }
 };
 
 int main() {
     Library lib;
+    
     lib.add_book(Book("1984", "Orwell", 1949));
     lib.add_book(Book("Animal Farm", "Orwell", 1945));
     lib.add_book(Book("Crime and Punishment", "Dostoevsky", 1866));
