@@ -11,3 +11,18 @@
 [2025-07-23 19:46:04] ERROR: Book 'Nonexistent Book' by 'Nonexistent Author' not found.
 [2025-07-23 19:46:04] Statistics: Total=2, Borrowed=0, Available=2
 [2025-07-23 19:46:04] Library system shutdown
+[2025-07-25 00:02:39] [INFO] Library system started
+[2025-07-25 00:02:39] [INFO] Book '1984' added successfully.
+[2025-07-25 00:02:39] [INFO] Book 'Animal Farm' added successfully.
+[2025-07-25 00:02:39] [INFO] Book 'Crime and Punishment' added successfully.
+[2025-07-25 00:02:39] [ERROR] Book '1984' already exists in the library.
+[2025-07-25 00:02:39] [INFO] Book '1984' borrowed successfully.
+[2025-07-25 00:02:39] [WARNING] Book '1984' is already borrowed.
+[2025-07-25 00:02:39] [INFO] Displayed list of 3 books
+[2025-07-25 00:02:39] [INFO] Book '1984' returned successfully.
+[2025-07-25 00:02:39] [INFO] Displayed list of 3 books
+[2025-07-25 00:02:39] [INFO] Found 2 books by author 'Orwell'
+[2025-07-25 00:02:39] [INFO] Book 'Animal Farm' by 'Orwell' deleted successfully.
+[2025-07-25 00:02:39] [ERROR] Book 'Nonexistent Book' by 'Nonexistent Author' not found.
+[2025-07-25 00:02:39] [INFO] Statistics: Total=2, Borrowed=0, Available=2
+[2025-07-25 00:02:39] [INFO] Library system shutdown

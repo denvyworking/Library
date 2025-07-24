@@ -7,6 +7,13 @@
 
 using namespace std;
 
+// Enum для уровней логирования
+enum class LogLevel {
+    INFO,
+    WARNING,
+    ERROR
+};
+
 // Функция для получения текущего времени в формате [YYYY-MM-DD HH:MM:SS]
 string get_current_time() {
     time_t now = time(0);
@@ -44,19 +51,28 @@ public:
     }
 };
 
-// Класс "Библиотека" с логированием
+// Класс "Библиотека" с улучшенным логированием
 class Library {
 private:
     vector<Book> books;
-    ofstream log_file; // Файл для логов
+    ofstream log_file;
 
-    // Метод для записи в лог
-    void write_log(const string& message) {
+    // Улучшенный метод для записи в лог с уровнями
+    void write_log(LogLevel level, const string& message) {
+        string level_str;
+        switch(level) {
+            case LogLevel::INFO:    level_str = "INFO";    break;
+            case LogLevel::WARNING: level_str = "WARNING"; break;
+            case LogLevel::ERROR:   level_str = "ERROR";   break;
+        }
+        
+        string log_entry = "[" + get_current_time() + "] [" + level_str + "] " + message;
+        
         if(log_file.is_open()) {
-            log_file << "[" << get_current_time() << "] " << message << endl;
+            log_file << log_entry << endl;
         }
         // Также выводим в консоль для удобства
-        cout << "[" << get_current_time() << "] LOG: " << message << endl;
+        cout << log_entry << endl;
     }
 
 public:
@@ -64,7 +80,7 @@ public:
     Library() {
         log_file.open("library.log", ios::app); // Открываем в режиме добавления
         if(log_file.is_open()) {
-            write_log("Library system started");
+            write_log(LogLevel::INFO, "Library system started");
         } else {
             cerr << "Warning: Could not open log file!" << endl;
         }
@@ -73,7 +89,7 @@ public:
     // Деструктор - закрываем файл лога
     ~Library() {
         if(log_file.is_open()) {
-            write_log("Library system shutdown");
+            write_log(LogLevel::INFO, "Library system shutdown");
             log_file.close();
         }
     }
@@ -81,17 +97,17 @@ public:
     bool add_book(const Book& book) {
         for(const auto& elem : books) {
             if(elem == book) {
-                string error_msg = "ERROR: Book '" + book.get_title() + 
+                string error_msg = "Book '" + book.get_title() + 
                                  "' already exists in the library.";
-                write_log(error_msg);
-                cerr << error_msg << endl;
+                write_log(LogLevel::ERROR, error_msg);
+                cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
                 return false;
             }
         }
         books.push_back(book);
         string success_msg = "Book '" + book.get_title() + "' added successfully.";
-        write_log(success_msg);
-        cout << success_msg << endl;
+        write_log(LogLevel::INFO, success_msg);
+        cout << "[" << get_current_time() << "] [INFO] " << success_msg << endl;
         return true;
     }
 
@@ -101,19 +117,19 @@ public:
                 if(!elem.get_is_borrowed()) {
                     elem.borrow();
                     string msg = "Book '" + title + "' borrowed successfully.";
-                    write_log(msg);
-                    cout << msg << endl;
+                    write_log(LogLevel::INFO, msg);
+                    cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                     return true;
                 }
-                string error_msg = "ERROR: Book '" + title + "' is already borrowed.";
-                write_log(error_msg);
-                cerr << error_msg << endl;
+                string warning_msg = "Book '" + title + "' is already borrowed.";
+                write_log(LogLevel::WARNING, warning_msg);
+                cerr << "[" << get_current_time() << "] [WARNING] " << warning_msg << endl;
                 return false;
             }
         }
-        string error_msg = "ERROR: Book '" + title + "' not found.";
-        write_log(error_msg);
-        cerr << error_msg << endl;
+        string error_msg = "Book '" + title + "' not found.";
+        write_log(LogLevel::ERROR, error_msg);
+        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
@@ -123,19 +139,19 @@ public:
                 if(elem.get_is_borrowed()) {
                     elem.return_book();
                     string msg = "Book '" + title + "' returned successfully.";
-                    write_log(msg);
-                    cout << msg << endl;
+                    write_log(LogLevel::INFO, msg);
+                    cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                     return true;
                 }
-                string error_msg = "ERROR: Book '" + title + "' was not borrowed.";
-                write_log(error_msg);
-                cerr << error_msg << endl;
+                string warning_msg = "Book '" + title + "' was not borrowed.";
+                write_log(LogLevel::WARNING, warning_msg);
+                cerr << "[" << get_current_time() << "] [WARNING] " << warning_msg << endl;
                 return false;
             }
         }
-        string error_msg = "ERROR: Book '" + title + "' not found.";
-        write_log(error_msg);
-        cerr << error_msg << endl;
+        string error_msg = "Book '" + title + "' not found.";
+        write_log(LogLevel::ERROR, error_msg);
+        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
@@ -150,6 +166,9 @@ public:
             cout << "++===++ " << elem.get_title() << " (" << elem.get_author() 
                  << ", " << elem.get_year() << ") - " << elem.get_status() << endl;
         }
+        
+        string msg = "Displayed list of " + to_string(books.size()) + " books";
+        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
     }
 
     vector<Book> find_by_author(const string& author) const {
@@ -160,7 +179,7 @@ public:
             }
         }
         string msg = "Found " + to_string(result.size()) + " books by author '" + author + "'";
-        const_cast<Library*>(this)->write_log(msg); // Небольшой хак для записи из const метода
+        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
         return result;
     }
 
@@ -172,7 +191,7 @@ public:
             }
         }
         string msg = "Found " + to_string(result.size()) + " books with title '" + title + "'";
-        const_cast<Library*>(this)->write_log(msg);
+        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
         return result;
     }
 
@@ -180,22 +199,22 @@ public:
         for(auto it = books.begin(); it != books.end(); ++it) {
             if(it->get_title() == title && it->get_author() == author) {
                 if(it->get_is_borrowed()) {
-                    string error_msg = "ERROR: Cannot delete borrowed book '" + title 
+                    string error_msg = "Cannot delete borrowed book '" + title 
                                      + "' by '" + author + "'.";
-                    write_log(error_msg);
-                    cerr << error_msg << endl;
+                    write_log(LogLevel::ERROR, error_msg);
+                    cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
                     return false;
                 }
                 books.erase(it);
                 string msg = "Book '" + title + "' by '" + author + "' deleted successfully.";
-                write_log(msg);
-                cout << msg << endl;
+                write_log(LogLevel::INFO, msg);
+                cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                 return true;
             }
         }
-        string error_msg = "ERROR: Book '" + title + "' by '" + author + "' not found.";
-        write_log(error_msg);
-        cerr << error_msg << endl;
+        string error_msg = "Book '" + title + "' by '" + author + "' not found.";
+        write_log(LogLevel::ERROR, error_msg);
+        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
@@ -213,7 +232,7 @@ public:
         string msg = "Statistics: Total=" + to_string(books.size()) + 
                     ", Borrowed=" + to_string(borrowed) + 
                     ", Available=" + to_string(books.size() - borrowed);
-        const_cast<Library*>(this)->write_log(msg);
+        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
     }
 };
 
