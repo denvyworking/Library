@@ -100,14 +100,12 @@ public:
                 string error_msg = "Book '" + book.get_title() + 
                                  "' already exists in the library.";
                 write_log(LogLevel::ERROR, error_msg);
-                cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
                 return false;
             }
         }
         books.push_back(book);
         string success_msg = "Book '" + book.get_title() + "' added successfully.";
         write_log(LogLevel::INFO, success_msg);
-        cout << "[" << get_current_time() << "] [INFO] " << success_msg << endl;
         return true;
     }
 
@@ -118,18 +116,15 @@ public:
                     elem.borrow();
                     string msg = "Book '" + title + "' borrowed successfully.";
                     write_log(LogLevel::INFO, msg);
-                    cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                     return true;
                 }
                 string warning_msg = "Book '" + title + "' is already borrowed.";
                 write_log(LogLevel::WARNING, warning_msg);
-                cerr << "[" << get_current_time() << "] [WARNING] " << warning_msg << endl;
                 return false;
             }
         }
         string error_msg = "Book '" + title + "' not found.";
         write_log(LogLevel::ERROR, error_msg);
-        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
@@ -140,18 +135,15 @@ public:
                     elem.return_book();
                     string msg = "Book '" + title + "' returned successfully.";
                     write_log(LogLevel::INFO, msg);
-                    cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                     return true;
                 }
                 string warning_msg = "Book '" + title + "' was not borrowed.";
                 write_log(LogLevel::WARNING, warning_msg);
-                cerr << "[" << get_current_time() << "] [WARNING] " << warning_msg << endl;
                 return false;
             }
         }
         string error_msg = "Book '" + title + "' not found.";
         write_log(LogLevel::ERROR, error_msg);
-        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
@@ -202,19 +194,16 @@ public:
                     string error_msg = "Cannot delete borrowed book '" + title 
                                      + "' by '" + author + "'.";
                     write_log(LogLevel::ERROR, error_msg);
-                    cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
                     return false;
                 }
                 books.erase(it);
                 string msg = "Book '" + title + "' by '" + author + "' deleted successfully.";
                 write_log(LogLevel::INFO, msg);
-                cout << "[" << get_current_time() << "] [INFO] " << msg << endl;
                 return true;
             }
         }
         string error_msg = "Book '" + title + "' by '" + author + "' not found.";
         write_log(LogLevel::ERROR, error_msg);
-        cerr << "[" << get_current_time() << "] [ERROR] " << error_msg << endl;
         return false;
     }
 
