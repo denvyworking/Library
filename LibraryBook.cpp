@@ -1,9 +1,10 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <fstream>   // Для работы с файлами
-#include <ctime>     // Для получения времени
-#include <iomanip>   // Для форматирования времени
+#include <fstream>
+#include <ctime>
+#include <iomanip>
+#include <stdexcept>  // Для стандартных исключений
 
 using namespace std;
 
@@ -51,7 +52,7 @@ public:
     }
 };
 
-// Класс "Библиотека" с улучшенным логированием
+// Класс "Библиотека" с улучшенным логированием и обработкой исключений
 class Library {
 private:
     vector<Book> books;
@@ -76,13 +77,18 @@ private:
     }
 
 public:
-    // Конструктор - открываем файл лога
+    // Конструктор - открываем файл лога с обработкой ошибок
     Library() {
-        log_file.open("library.log", ios::app); // Открываем в режиме добавления
-        if(log_file.is_open()) {
+        try {
+            log_file.open("library.log", ios::app);
+            if(!log_file.is_open()) {
+                throw runtime_error("Failed to open log file");
+            }
             write_log(LogLevel::INFO, "Library system started");
-        } else {
-            cerr << "Warning: Could not open log file!" << endl;
+        } 
+        catch (const exception& e) {
+            cerr << "CRITICAL ERROR (logging): " << e.what() << endl;
+            // Можно добавить fallback-логирование в консоль
         }
     }
 
@@ -94,59 +100,58 @@ public:
         }
     }
 
-    bool add_book(const Book& book) {
+    // Добавление книги с генерацией исключения при ошибке
+    void add_book(const Book& book) {
         for(const auto& elem : books) {
             if(elem == book) {
-                string error_msg = "Book '" + book.get_title() + 
-                                 "' already exists in the library.";
+                string error_msg = "Book '" + book.get_title() + "' already exists";
                 write_log(LogLevel::ERROR, error_msg);
-                return false;
+                throw runtime_error(error_msg);
             }
         }
         books.push_back(book);
-        string success_msg = "Book '" + book.get_title() + "' added successfully.";
-        write_log(LogLevel::INFO, success_msg);
-        return true;
+        write_log(LogLevel::INFO, "Book added: " + book.get_title());
     }
 
-    bool borrow_book(const string& title) {
+    // Взятие книги с обработкой ошибок
+    void borrow_book(const string& title) {
         for(auto& elem : books) {
             if(elem.get_title() == title) {
                 if(!elem.get_is_borrowed()) {
                     elem.borrow();
-                    string msg = "Book '" + title + "' borrowed successfully.";
-                    write_log(LogLevel::INFO, msg);
-                    return true;
+                    write_log(LogLevel::INFO, "Book '" + title + "' borrowed");
+                    return;
                 }
-                string warning_msg = "Book '" + title + "' is already borrowed.";
-                write_log(LogLevel::WARNING, warning_msg);
-                return false;
+                string error_msg = "Book '" + title + "' is already borrowed";
+                write_log(LogLevel::ERROR, error_msg);
+                throw runtime_error(error_msg);
             }
         }
-        string error_msg = "Book '" + title + "' not found.";
+        string error_msg = "Book '" + title + "' not found";
         write_log(LogLevel::ERROR, error_msg);
-        return false;
+        throw runtime_error(error_msg);
     }
 
-    bool return_book(const string& title) {
+    // Возврат книги с обработкой ошибок
+    void return_book(const string& title) {
         for(auto& elem : books) {
             if(elem.get_title() == title) {
                 if(elem.get_is_borrowed()) {
                     elem.return_book();
-                    string msg = "Book '" + title + "' returned successfully.";
-                    write_log(LogLevel::INFO, msg);
-                    return true;
+                    write_log(LogLevel::INFO, "Book '" + title + "' returned");
+                    return;
                 }
-                string warning_msg = "Book '" + title + "' was not borrowed.";
-                write_log(LogLevel::WARNING, warning_msg);
-                return false;
+                string error_msg = "Book '" + title + "' was not borrowed";
+                write_log(LogLevel::WARNING, error_msg);
+                throw runtime_error(error_msg);
             }
         }
-        string error_msg = "Book '" + title + "' not found.";
+        string error_msg = "Book '" + title + "' not found";
         write_log(LogLevel::ERROR, error_msg);
-        return false;
+        throw runtime_error(error_msg);
     }
 
+    // Вывод списка книг
     void print_books() const {
         if(books.empty()) {
             cout << "The library has no books yet." << endl;
@@ -163,6 +168,7 @@ public:
         const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
     }
 
+    // Поиск по автору
     vector<Book> find_by_author(const string& author) const {
         vector<Book> result;
         for(const auto& elem : books) {
@@ -175,38 +181,26 @@ public:
         return result;
     }
 
-    vector<Book> find_by_title(const string& title) const {
-        vector<Book> result;
-        for(const auto& elem : books) {
-            if(elem.get_title() == title) {
-                result.push_back(elem);
-            }
-        }
-        string msg = "Found " + to_string(result.size()) + " books with title '" + title + "'";
-        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
-        return result;
-    }
-
-    bool remove_book(const string& title, const string& author) {
+    // Удаление книги с обработкой ошибок
+    void remove_book(const string& title, const string& author) {
         for(auto it = books.begin(); it != books.end(); ++it) {
             if(it->get_title() == title && it->get_author() == author) {
                 if(it->get_is_borrowed()) {
-                    string error_msg = "Cannot delete borrowed book '" + title 
-                                     + "' by '" + author + "'.";
+                    string error_msg = "Cannot delete borrowed book '" + title + "'";
                     write_log(LogLevel::ERROR, error_msg);
-                    return false;
+                    throw runtime_error(error_msg);
                 }
                 books.erase(it);
-                string msg = "Book '" + title + "' by '" + author + "' deleted successfully.";
-                write_log(LogLevel::INFO, msg);
-                return true;
+                write_log(LogLevel::INFO, "Book '" + title + "' deleted");
+                return;
             }
         }
-        string error_msg = "Book '" + title + "' by '" + author + "' not found.";
+        string error_msg = "Book '" + title + "' not found";
         write_log(LogLevel::ERROR, error_msg);
-        return false;
+        throw runtime_error(error_msg);
     }
 
+    // Статистика библиотеки
     void print_stats() const {
         cout << "\nLibrary Statistics:" << endl;
         cout << "++===++ Total books: " << books.size() << endl;
@@ -226,32 +220,44 @@ public:
 };
 
 int main() {
-    Library lib;
-    
-    lib.add_book(Book("1984", "Orwell", 1949));
-    lib.add_book(Book("Animal Farm", "Orwell", 1945));
-    lib.add_book(Book("Crime and Punishment", "Dostoevsky", 1866));
-    lib.add_book(Book("1984", "Orwell", 1949));
-
-    lib.borrow_book("1984");
-    lib.borrow_book("1984");
-    lib.print_books();
-
-    lib.return_book("1984");
-    lib.print_books();
-
-    auto orwell_books = lib.find_by_author("Orwell");
-    if(!orwell_books.empty()) {
-        cout << "\nBooks by Orwell:" << endl;
-        for(const auto& book : orwell_books) {
-            cout << "- " << book.get_title() << " (" << book.get_year() << ")" << endl;
+    try {
+        Library lib;
+        
+        // Тестирование основных функций
+        lib.add_book(Book("1984", "Orwell", 1949));
+        lib.add_book(Book("Animal Farm", "Orwell", 1945));
+        lib.add_book(Book("Crime and Punishment", "Dostoevsky", 1866));
+        
+        lib.borrow_book("1984");
+        lib.print_books();
+        
+        lib.return_book("1984");
+        lib.print_books();
+        
+        auto orwell_books = lib.find_by_author("Orwell");
+        if(!orwell_books.empty()) {
+            cout << "\nBooks by Orwell:" << endl;
+            for(const auto& book : orwell_books) {
+                cout << "- " << book.get_title() << " (" << book.get_year() << ")" << endl;
+            }
         }
+        
+        lib.remove_book("Animal Farm", "Orwell");
+        lib.print_stats();
+
+    } 
+    catch (const runtime_error& e) {
+        cerr << "RUNTIME ERROR: " << e.what() << endl;
+        return 1;
     }
-
-    lib.remove_book("Animal Farm", "Orwell");
-    lib.remove_book("Nonexistent Book", "Nonexistent Author");
-
-    lib.print_stats();
-
+    catch (const exception& e) {
+        cerr << "ERROR: " << e.what() << endl;
+        return 2;
+    }
+    catch (...) {
+        cerr << "UNKNOWN ERROR" << endl;
+        return 3;
+    }
+    
     return 0;
 }
