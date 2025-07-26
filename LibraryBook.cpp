@@ -219,44 +219,60 @@ public:
     }
 };
 
-int main() {
+// ==================== ТЕСТЫ ====================
+void run_tests() {
+    cout << "\n=== НАЧАЛО ТЕСТИРОВАНИЯ ===\n";
+    
+    // Тест 1: Создание книги
+    Book book("Test Book", "Test Author", 2023);
+    cout << "Тест 1: " << (book.get_title() == "Test Book" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
+    
+    // Тест 2: Статус книги
+    cout << "Тест 2: " << (book.get_status() == "available" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
+    
+    // Тест 3: Взятие книги
+    book.borrow();
+    cout << "Тест 3: " << (book.get_status() == "borrowed" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
+    
+    // Тест 4: Возврат книги
+    book.return_book();
+    cout << "Тест 4: " << (book.get_status() == "available" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
+    
+    // Тест 5: Добавление книги в библиотеку
+    Library lib;
     try {
+        lib.add_book(book);
+        cout << "Тест 5: ПРОЙДЕН (книга добавлена)" << endl;
+    } catch (...) {
+        cout << "Тест 5: НЕ ПРОЙДЕН (не удалось добавить книгу)" << endl;
+    }
+    
+    // Тест 6: Попытка добавить дубликат
+    try {
+        lib.add_book(book);
+        cout << "Тест 6: НЕ ПРОЙДЕН (дубликат добавлен)" << endl;
+    } catch (const exception& e) {
+        cout << "Тест 6: ПРОЙДЕН (" << e.what() << ")" << endl;
+    }
+    
+    cout << "=== ТЕСТИРОВАНИЕ ЗАВЕРШЕНО ===\n\n";
+}
+
+int main() {
+    run_tests();  // Сначала запускаем тесты
+    
+    try {
+        // Затем основной код программы
         Library lib;
         
-        // Тестирование основных функций
         lib.add_book(Book("1984", "Orwell", 1949));
         lib.add_book(Book("Animal Farm", "Orwell", 1945));
-        lib.add_book(Book("Crime and Punishment", "Dostoevsky", 1866));
         
-        lib.borrow_book("1984");
         lib.print_books();
         
-        lib.return_book("1984");
-        lib.print_books();
-        
-        auto orwell_books = lib.find_by_author("Orwell");
-        if(!orwell_books.empty()) {
-            cout << "\nBooks by Orwell:" << endl;
-            for(const auto& book : orwell_books) {
-                cout << "- " << book.get_title() << " (" << book.get_year() << ")" << endl;
-            }
-        }
-        
-        lib.remove_book("Animal Farm", "Orwell");
-        lib.print_stats();
-
-    } 
-    catch (const runtime_error& e) {
-        cerr << "RUNTIME ERROR: " << e.what() << endl;
+    } catch (const exception& e) {
+        cerr << "Ошибка: " << e.what() << endl;
         return 1;
-    }
-    catch (const exception& e) {
-        cerr << "ERROR: " << e.what() << endl;
-        return 2;
-    }
-    catch (...) {
-        cerr << "UNKNOWN ERROR" << endl;
-        return 3;
     }
     
     return 0;

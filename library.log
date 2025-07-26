@@ -71,3 +71,12 @@
 [2025-07-25 00:28:49] [ERROR] Book 'Nonexistent Book' by 'Nonexistent Author' not found.
 [2025-07-25 00:28:49] [INFO] Statistics: Total=2, Borrowed=0, Available=2
 [2025-07-25 00:28:49] [INFO] Library system shutdown
+[2025-07-26 15:44:57] [INFO] Library system started
+[2025-07-26 15:44:57] [INFO] Book added: Test Book
+[2025-07-26 15:44:57] [ERROR] Book 'Test Book' already exists
+[2025-07-26 15:44:57] [INFO] Library system shutdown
+[2025-07-26 15:44:57] [INFO] Library system started
+[2025-07-26 15:44:57] [INFO] Book added: 1984
+[2025-07-26 15:44:57] [INFO] Book added: Animal Farm
+[2025-07-26 15:44:57] [INFO] Displayed list of 2 books
+[2025-07-26 15:44:57] [INFO] Library system shutdown
