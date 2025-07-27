@@ -4,18 +4,16 @@
 #include <fstream>
 #include <ctime>
 #include <iomanip>
-#include <stdexcept>  // Для стандартных исключений
+#include <stdexcept>
 
 using namespace std;
 
-// Enum для уровней логирования
 enum class LogLevel {
     INFO,
     WARNING,
     ERROR
 };
 
-// Функция для получения текущего времени в формате [YYYY-MM-DD HH:MM:SS]
 string get_current_time() {
     time_t now = time(0);
     tm* local_time = localtime(&now);
@@ -24,7 +22,41 @@ string get_current_time() {
     return string(buffer);
 }
 
-// Класс "Книга"
+class Logger {
+private:
+    mutable ofstream log_file;  // mutable, так как запись в файл - техническая деталь
+    
+public:
+    Logger(const string& filename) {
+        log_file.open(filename, ofstream::app);
+        if (!log_file.is_open()) {
+            throw runtime_error("Failed to open log file");
+        }
+        log(LogLevel::INFO, "Logger initialized");
+    }
+    
+    ~Logger() {
+        if (log_file.is_open()) {
+            log(LogLevel::INFO, "Logger shutdown");
+            log_file.close();
+        }
+    }
+    
+    void log(LogLevel level, const string& message) const {
+        string level_str;
+        switch(level) {
+            case LogLevel::INFO:    level_str = "INFO";    break;
+            case LogLevel::WARNING: level_str = "WARNING"; break;
+            case LogLevel::ERROR:   level_str = "ERROR";   break;
+        }
+        
+        string log_entry = "[" + get_current_time() + "] [" + level_str + "] " + message;
+        
+        log_file << log_entry << endl;
+        cout << log_entry << endl;
+    }
+};
+
 class Book {
 private:
     string title;
@@ -52,109 +84,72 @@ public:
     }
 };
 
-// Класс "Библиотека" с улучшенным логированием и обработкой исключений
 class Library {
 private:
     vector<Book> books;
-    ofstream log_file;
-
-    // Улучшенный метод для записи в лог с уровнями
-    void write_log(LogLevel level, const string& message) {
-        string level_str;
-        switch(level) {
-            case LogLevel::INFO:    level_str = "INFO";    break;
-            case LogLevel::WARNING: level_str = "WARNING"; break;
-            case LogLevel::ERROR:   level_str = "ERROR";   break;
-        }
-        
-        string log_entry = "[" + get_current_time() + "] [" + level_str + "] " + message;
-        
-        if(log_file.is_open()) {
-            log_file << log_entry << endl;
-        }
-        // Также выводим в консоль для удобства
-        cout << log_entry << endl;
-    }
+    mutable Logger logger;  // mutable, так как логирование не меняет состояние библиотеки
 
 public:
-    // Конструктор - открываем файл лога с обработкой ошибок
-    Library() {
-        try {
-            log_file.open("library.log", ios::app);
-            if(!log_file.is_open()) {
-                throw runtime_error("Failed to open log file");
-            }
-            write_log(LogLevel::INFO, "Library system started");
-        } 
-        catch (const exception& e) {
-            cerr << "CRITICAL ERROR (logging): " << e.what() << endl;
-            // Можно добавить fallback-логирование в консоль
-        }
+    Library() : logger("library.log") {
+        logger.log(LogLevel::INFO, "Library system started");
     }
 
-    // Деструктор - закрываем файл лога
     ~Library() {
-        if(log_file.is_open()) {
-            write_log(LogLevel::INFO, "Library system shutdown");
-            log_file.close();
-        }
+        logger.log(LogLevel::INFO, "Library system shutdown");
     }
 
-    // Добавление книги с генерацией исключения при ошибке
     void add_book(const Book& book) {
         for(const auto& elem : books) {
             if(elem == book) {
                 string error_msg = "Book '" + book.get_title() + "' already exists";
-                write_log(LogLevel::ERROR, error_msg);
+                logger.log(LogLevel::ERROR, error_msg);
                 throw runtime_error(error_msg);
             }
         }
         books.push_back(book);
-        write_log(LogLevel::INFO, "Book added: " + book.get_title());
+        logger.log(LogLevel::INFO, "Book added: " + book.get_title());
     }
 
-    // Взятие книги с обработкой ошибок
     void borrow_book(const string& title) {
         for(auto& elem : books) {
             if(elem.get_title() == title) {
                 if(!elem.get_is_borrowed()) {
                     elem.borrow();
-                    write_log(LogLevel::INFO, "Book '" + title + "' borrowed");
+                    logger.log(LogLevel::INFO, "Book '" + title + "' borrowed");
                     return;
                 }
                 string error_msg = "Book '" + title + "' is already borrowed";
-                write_log(LogLevel::ERROR, error_msg);
+                logger.log(LogLevel::ERROR, error_msg);
                 throw runtime_error(error_msg);
             }
         }
         string error_msg = "Book '" + title + "' not found";
-        write_log(LogLevel::ERROR, error_msg);
+        logger.log(LogLevel::ERROR, error_msg);
         throw runtime_error(error_msg);
     }
 
-    // Возврат книги с обработкой ошибок
     void return_book(const string& title) {
         for(auto& elem : books) {
             if(elem.get_title() == title) {
                 if(elem.get_is_borrowed()) {
                     elem.return_book();
-                    write_log(LogLevel::INFO, "Book '" + title + "' returned");
+                    logger.log(LogLevel::INFO, "Book '" + title + "' returned");
                     return;
                 }
                 string error_msg = "Book '" + title + "' was not borrowed";
-                write_log(LogLevel::WARNING, error_msg);
+                logger.log(LogLevel::WARNING, error_msg);
                 throw runtime_error(error_msg);
             }
         }
         string error_msg = "Book '" + title + "' not found";
-        write_log(LogLevel::ERROR, error_msg);
+        logger.log(LogLevel::ERROR, error_msg);
         throw runtime_error(error_msg);
     }
 
-    // Вывод списка книг
     void print_books() const {
         if(books.empty()) {
             cout << "The library has no books yet." << endl;
+            logger.log(LogLevel::INFO, "Displayed empty book list");
             return;
         }
         
@@ -164,11 +159,9 @@ public:
                  << ", " << elem.get_year() << ") - " << elem.get_status() << endl;
         }
         
-        string msg = "Displayed list of " + to_string(books.size()) + " books";
-        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
+        logger.log(LogLevel::INFO, "Displayed list of " + to_string(books.size()) + " books");
     }
 
-    // Поиск по автору
     vector<Book> find_by_author(const string& author) const {
         vector<Book> result;
         for(const auto& elem : books) {
@@ -176,31 +169,29 @@ public:
                 result.push_back(elem);
             }
         }
-        string msg = "Found " + to_string(result.size()) + " books by author '" + author + "'";
-        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
+        logger.log(LogLevel::INFO, 
+            "Found " + to_string(result.size()) + " books by author '" + author + "'");
         return result;
     }
 
-    // Удаление книги с обработкой ошибок
     void remove_book(const string& title, const string& author) {
         for(auto it = books.begin(); it != books.end(); ++it) {
             if(it->get_title() == title && it->get_author() == author) {
                 if(it->get_is_borrowed()) {
                     string error_msg = "Cannot delete borrowed book '" + title + "'";
-                    write_log(LogLevel::ERROR, error_msg);
+                    logger.log(LogLevel::ERROR, error_msg);
                     throw runtime_error(error_msg);
                 }
                 books.erase(it);
-                write_log(LogLevel::INFO, "Book '" + title + "' deleted");
+                logger.log(LogLevel::INFO, "Book '" + title + "' deleted");
                 return;
             }
         }
         string error_msg = "Book '" + title + "' not found";
-        write_log(LogLevel::ERROR, error_msg);
+        logger.log(LogLevel::ERROR, error_msg);
         throw runtime_error(error_msg);
     }
 
-    // Статистика библиотеки
     void print_stats() const {
         cout << "\nLibrary Statistics:" << endl;
         cout << "++===++ Total books: " << books.size() << endl;
@@ -212,10 +203,10 @@ public:
         cout << "++===++ Borrowed books: " << borrowed << endl;
         cout << "++===++ Available books: " << books.size() - borrowed << endl;
         
-        string msg = "Statistics: Total=" + to_string(books.size()) + 
-                    ", Borrowed=" + to_string(borrowed) + 
-                    ", Available=" + to_string(books.size() - borrowed);
-        const_cast<Library*>(this)->write_log(LogLevel::INFO, msg);
+        logger.log(LogLevel::INFO, 
+            "Statistics: Total=" + to_string(books.size()) + 
+            ", Borrowed=" + to_string(borrowed) + 
+            ", Available=" + to_string(books.size() - borrowed));
     }
 };
 
