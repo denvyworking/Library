@@ -14,16 +14,21 @@ enum class LogLevel {
     ERROR
 };
 
-string get_current_time() {
-    time_t now = time(0);
-    tm* local_time = localtime(&now);
-    char buffer[100];
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", local_time);
-    return string(buffer);
-}
+
+class TimeUtil {
+public:
+    static string get_current_time() {
+        time_t now = time(0);
+        tm* local_time = localtime(&now);
+        char buffer[100];
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", local_time);
+        return string(buffer);
+    }
+};
 
 class Logger {
 private:
+    // говорит, что даже внутри const методов член класса можно менять
     mutable ofstream log_file;  // mutable, так как запись в файл - техническая деталь
     
 public:
@@ -50,7 +55,7 @@ public:
             case LogLevel::ERROR:   level_str = "ERROR";   break;
         }
         
-        string log_entry = "[" + get_current_time() + "] [" + level_str + "] " + message;
+        string log_entry = "[" + TimeUtil::get_current_time() + "] [" + level_str + "] " + message;
         
         log_file << log_entry << endl;
         cout << log_entry << endl;
@@ -149,6 +154,7 @@ public:
     void print_books() const {
         if(books.empty()) {
             cout << "The library has no books yet." << endl;
+            // можно менять в const мутодах просто, без const_cast
             logger.log(LogLevel::INFO, "Displayed empty book list");
             return;
         }

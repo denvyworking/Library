@@ -93,3 +93,16 @@
 [2025-07-28 00:21:14] [INFO] Displayed list of 2 books
 [2025-07-28 00:21:14] [INFO] Library system shutdown
 [2025-07-28 00:21:14] [INFO] Logger shutdown
+[2025-07-31 00:02:50] [INFO] Logger initialized
+[2025-07-31 00:02:50] [INFO] Library system started
+[2025-07-31 00:02:50] [INFO] Book added: Test Book
+[2025-07-31 00:02:50] [ERROR] Book 'Test Book' already exists
+[2025-07-31 00:02:50] [INFO] Library system shutdown
+[2025-07-31 00:02:50] [INFO] Logger shutdown
+[2025-07-31 00:02:50] [INFO] Logger initialized
+[2025-07-31 00:02:50] [INFO] Library system started
+[2025-07-31 00:02:50] [INFO] Book added: 1984
+[2025-07-31 00:02:50] [INFO] Book added: Animal Farm
+[2025-07-31 00:02:50] [INFO] Displayed list of 2 books
+[2025-07-31 00:02:50] [INFO] Library system shutdown
+[2025-07-31 00:02:50] [INFO] Logger shutdown
