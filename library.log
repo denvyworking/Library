@@ -106,3 +106,12 @@
 [2025-07-31 00:02:50] [INFO] Displayed list of 2 books
 [2025-07-31 00:02:50] [INFO] Library system shutdown
 [2025-07-31 00:02:50] [INFO] Logger shutdown
+[2025-08-03 00:48:38] [INFO] FileLogger initialized
+[2025-08-03 00:48:38] [INFO] LibraryService initialized
+[2025-08-03 00:48:38] [INFO] Book added: 1984
+[2025-08-03 00:48:38] [INFO] Book added: Animal Farm
+[2025-08-03 00:48:38] [INFO] Displayed 2 books
+[2025-08-03 00:48:38] [INFO] Stats: Total=2, Borrowed=0
+[2025-08-03 00:48:38] [INFO] Book borrowed: 1984
+[2025-08-03 00:48:38] [INFO] Stats: Total=2, Borrowed=1
+[2025-08-03 00:48:38] [INFO] FileLogger shutdown

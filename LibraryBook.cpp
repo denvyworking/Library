@@ -17,7 +17,7 @@ enum class LogLevel {
     ERROR
 };
 
-// ==================== УТИЛИТА ВРЕМЕНИ ====================
+// ================= УТИЛИТА ВРЕМЕНИ ===================
 class TimeUtil {
 public:
     static string get_current_time() {
@@ -37,7 +37,7 @@ public:
     virtual void log(LogLevel level, const string& message) = 0;
 };
 
-// ==================== ЛОГГЕР В ФАЙЛ ====================
+// ================ ЛОГГЕР В ФАЙЛ ================
 class FileLogger : public LoggerInterface {
 private:
     mutable ofstream log_file;
@@ -71,7 +71,7 @@ public:
     }
 };
 
-// ==================== ЛОГГЕР В КОНСОЛЬ ====================
+// ================== ЛОГГЕР В КОНСОЛЬ ===================
 class ConsoleLogger : public LoggerInterface {
 public:
     void log(LogLevel level, const string& message) override {
@@ -104,7 +104,7 @@ public:
     }
 };
 
-// ==================== КНИГА ====================
+// ============= КНИГА =============
 class Book {
 private:
     string title;
@@ -146,12 +146,13 @@ public:
     virtual vector<Book> find_by_author(const string& author) const = 0;
 };
 
-// ==================== ХРАНИЛИЩЕ КНИГ ====================
+// ================ ХРАНИЛИЩЕ КНИГ ================
 class BookRepository : public IBookRepository{
 protected:
     vector<Book> books;
 
 public:
+    ~BookRepository() override = default;
     virtual void add_book(const Book& book) {
         for (const auto& b : books) {
             if (b == book) {
@@ -215,6 +216,8 @@ public:
             logger->log(LogLevel::INFO, "Book added: " + book.get_title());
         } catch (const exception& e) {
             logger->log(LogLevel::ERROR, "Failed to add book: " + string(e.what()));
+            // в случае ошибки в add_book в BookRepository прокинет ошибку дальше
+            // и обработает уже в main()
             throw;
         }
     }
@@ -268,7 +271,7 @@ public:
     }
 
     vector<Book> find_by_author(const string& author) const {
-        auto result = repository->find_by_author(author);
+        vector<Book> result = repository->find_by_author(author);
         logger->log(LogLevel::INFO, "Found " + to_string(result.size()) + " books by author '" + author + "'");
         return result;
     }
@@ -290,7 +293,7 @@ public:
     }
 };
 
-// ==================== ИНТЕРФЕЙС ОТОБРАЖЕНИЯ ====================
+// =============== ИНТЕРФЕЙС ОТОБРАЖЕНИЯ ==================
 class DisplayInterface {
 public:
     virtual ~DisplayInterface() = default;
@@ -299,7 +302,7 @@ public:
     virtual void show_stats(size_t total, size_t borrowed) = 0;
 };
 
-// ==================== ОТОБРАЖЕНИЕ В КОНСОЛИ ====================
+// ================== ОТОБРАЖЕНИЕ В КОНСОЛИ =================
 class ConsoleDisplay : public DisplayInterface {
 public:
     void show_message(const string& msg) override {
@@ -327,7 +330,7 @@ public:
     }
 };
 
-// ==================== СЕРВИС ОТЧЁТОВ ====================
+// ============== СЕРВИС ОТЧЁТОВ ==================
 class ReportService {
 private:
     shared_ptr<LibraryService> service;
@@ -362,7 +365,7 @@ void run_tests() {
     // аналог make_shared но с двойным выделением памяти
     //shared_ptr<BookRepository> repo (new BookRepository);
     // но есть возможность утечки памяти из-за throw
-    auto repo = make_shared<BookRepository>;
+    auto repo = make_shared<BookRepository>();
     auto service = make_shared<LibraryService>(repo, logger);
     auto display = make_shared<ConsoleDisplay>();
     auto reporter = make_shared<ReportService>(service, display, logger);
@@ -419,7 +422,11 @@ int main() {
         multi_logger->add_logger(file_logger);
         multi_logger->add_logger(console_logger);
 
+        // аналог make_shared но с двойным выделением памяти
+        //shared_ptr<BookRepository> repo (new BookRepository);
+        // но есть возможность утечки памяти из-за throw
         auto repo = make_shared<BookRepository>();
+
         auto service = make_shared<LibraryService>(repo, multi_logger);
         auto display = make_shared<ConsoleDisplay>();
         auto reporter = make_shared<ReportService>(service, display, multi_logger);
@@ -436,8 +443,6 @@ int main() {
 
         // Берём книгу
         service->borrow_book("1984");
-
-        // Снова статистика
         reporter->print_stats();
 
     } catch (const exception& e) {
