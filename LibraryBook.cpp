@@ -114,7 +114,7 @@ private:
 
 public:
     Book(string title, string author, int year)
-        : title(move(title)), author(move(author)), year(year), is_borrowed(false) {}
+        : title(title), author(author), year(year), is_borrowed(false) {}
 
     const string& get_title() const { return title; }
     const string& get_author() const { return author; }
@@ -133,14 +133,25 @@ public:
     }
 };
 
+
+class IBookRepository {
+public:
+    virtual ~IBookRepository() = default;
+
+    virtual void add_book(const Book& book) = 0;
+    virtual bool has_book(const string& title) const = 0;
+    virtual Book* find_book(const string& title) = 0;
+    virtual const vector<Book>& get_all_books() const = 0;
+    virtual void remove_book(const Book& book) = 0;
+    virtual vector<Book> find_by_author(const string& author) const = 0;
+};
+
 // ==================== ХРАНИЛИЩЕ КНИГ ====================
-class BookRepository {
+class BookRepository : public IBookRepository{
 protected:
     vector<Book> books;
 
 public:
-    virtual ~BookRepository() = default;
-
     virtual void add_book(const Book& book) {
         for (const auto& b : books) {
             if (b == book) {
@@ -166,11 +177,13 @@ public:
     }
 
     virtual void remove_book(const Book& book) {
-        books.erase(
-            remove_if(books.begin(), books.end(),
-                      [&book](const Book& b) { return b == book; }),
-            books.end()
-        );
+        for (auto it = books.begin(); it != books.end(); ) {
+            if (*it == book) {
+                it = books.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     virtual vector<Book> find_by_author(const string& author) const {
@@ -187,11 +200,11 @@ public:
 // ==================== СЕРВИС БИБЛИОТЕКИ ====================
 class LibraryService {
 private:
-    shared_ptr<BookRepository> repository;
+    shared_ptr<IBookRepository> repository;
     shared_ptr<LoggerInterface> logger;
 
 public:
-    LibraryService(shared_ptr<BookRepository> repo, shared_ptr<LoggerInterface> log)
+    LibraryService(shared_ptr<IBookRepository> repo, shared_ptr<LoggerInterface> log)
         : repository(move(repo)), logger(move(log)) {
         logger->log(LogLevel::INFO, "LibraryService initialized");
     }
@@ -346,7 +359,10 @@ void run_tests() {
     cout << "\n=== НАЧАЛО ТЕСТИРОВАНИЯ ===\n";
 
     auto logger = make_shared<ConsoleLogger>();
-    auto repo = make_shared<BookRepository>();
+    // аналог make_shared но с двойным выделением памяти
+    //shared_ptr<BookRepository> repo (new BookRepository);
+    // но есть возможность утечки памяти из-за throw
+    auto repo = make_shared<BookRepository>;
     auto service = make_shared<LibraryService>(repo, logger);
     auto display = make_shared<ConsoleDisplay>();
     auto reporter = make_shared<ReportService>(service, display, logger);
