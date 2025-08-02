@@ -5,16 +5,19 @@
 #include <ctime>
 #include <iomanip>
 #include <stdexcept>
+#include <memory>
+#include <algorithm>
 
 using namespace std;
 
+// ==================== ENUM УРОВНЯ ЛОГИРОВАНИЯ ====================
 enum class LogLevel {
     INFO,
     WARNING,
     ERROR
 };
 
-
+// ==================== УТИЛИТА ВРЕМЕНИ ====================
 class TimeUtil {
 public:
     static string get_current_time() {
@@ -22,46 +25,86 @@ public:
         tm* local_time = localtime(&now);
         char buffer[100];
         strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", local_time);
+        // создаёт объект типа std::string
         return string(buffer);
     }
 };
 
-class Logger {
-private:
-    // говорит, что даже внутри const методов член класса можно менять
-    mutable ofstream log_file;  // mutable, так как запись в файл - техническая деталь
-    
+// ==================== ИНТЕРФЕЙС ЛОГГЕРА ====================
+class LoggerInterface {
 public:
-    Logger(const string& filename) {
+    virtual ~LoggerInterface() = default;
+    virtual void log(LogLevel level, const string& message) = 0;
+};
+
+// ==================== ЛОГГЕР В ФАЙЛ ====================
+class FileLogger : public LoggerInterface {
+private:
+    mutable ofstream log_file;
+
+public:
+    FileLogger(const string& filename) {
         log_file.open(filename, ofstream::app);
         if (!log_file.is_open()) {
-            throw runtime_error("Failed to open log file");
+            throw runtime_error("Failed to open log file: " + filename);
         }
-        log(LogLevel::INFO, "Logger initialized");
+        log(LogLevel::INFO, "FileLogger initialized");
     }
-    
-    ~Logger() {
+
+    ~FileLogger() override {
         if (log_file.is_open()) {
-            log(LogLevel::INFO, "Logger shutdown");
+            log(LogLevel::INFO, "FileLogger shutdown");
             log_file.close();
         }
     }
-    
-    void log(LogLevel level, const string& message) const {
+
+    void log(LogLevel level, const string& message) override {
         string level_str;
         switch(level) {
             case LogLevel::INFO:    level_str = "INFO";    break;
-            case LogLevel::WARNING: level_str = "WARNING"; break;
+            case LogLevel::WARNING:    level_str = "WARNING"; break;
             case LogLevel::ERROR:   level_str = "ERROR";   break;
         }
-        
+
         string log_entry = "[" + TimeUtil::get_current_time() + "] [" + level_str + "] " + message;
-        
         log_file << log_entry << endl;
+    }
+};
+
+// ==================== ЛОГГЕР В КОНСОЛЬ ====================
+class ConsoleLogger : public LoggerInterface {
+public:
+    void log(LogLevel level, const string& message) override {
+        string level_str;
+        switch(level) {
+            case LogLevel::INFO:    level_str = "INFO";    break;
+            case LogLevel::WARNING:    level_str = "WARNING"; break;
+            case LogLevel::ERROR:   level_str = "ERROR";   break;
+        }
+
+        string log_entry = "[" + TimeUtil::get_current_time() + "] [" + level_str + "] " + message;
         cout << log_entry << endl;
     }
 };
 
+// ==================== МНОГОКАНАЛЬНЫЙ ЛОГГЕР (файл + консоль) ====================
+class MultiLogger : public LoggerInterface {
+private:
+    vector<shared_ptr<LoggerInterface>> loggers;
+
+public:
+    void add_logger(shared_ptr<LoggerInterface> logger) {
+        loggers.push_back(logger);
+    }
+
+    void log(LogLevel level, const string& message) override {
+        for (const auto& logger : loggers) {
+            logger->log(level, message);
+        }
+    }
+};
+
+// ==================== КНИГА ====================
 class Book {
 private:
     string title;
@@ -70,207 +113,321 @@ private:
     bool is_borrowed;
 
 public:
-    Book(string title, string author, int year) 
-        : title(title), author(author), year(year), is_borrowed(false) {}
+    Book(string title, string author, int year)
+        : title(move(title)), author(move(author)), year(year), is_borrowed(false) {}
 
-    string get_title() const { return title; }
-    string get_author() const { return author; }
+    const string& get_title() const { return title; }
+    const string& get_author() const { return author; }
     int get_year() const { return year; }
-    bool get_is_borrowed() const { return is_borrowed; }
+    bool is_borrowed_status() const { return is_borrowed; }
 
     void borrow() { is_borrowed = true; }
     void return_book() { is_borrowed = false; }
-    string get_status() const { 
-        return is_borrowed ? "borrowed" : "available"; 
+
+    string get_status() const {
+        return is_borrowed ? "borrowed" : "available";
     }
-    
+
     bool operator==(const Book& other) const {
         return title == other.title && author == other.author;
     }
 };
 
-class Library {
-private:
+// ==================== ХРАНИЛИЩЕ КНИГ ====================
+class BookRepository {
+protected:
     vector<Book> books;
-    mutable Logger logger;  // mutable, так как логирование не меняет состояние библиотеки
 
 public:
-    Library() : logger("library.log") {
-        logger.log(LogLevel::INFO, "Library system started");
-    }
+    virtual ~BookRepository() = default;
 
-    ~Library() {
-        logger.log(LogLevel::INFO, "Library system shutdown");
-    }
-
-    void add_book(const Book& book) {
-        for(const auto& elem : books) {
-            if(elem == book) {
-                string error_msg = "Book '" + book.get_title() + "' already exists";
-                logger.log(LogLevel::ERROR, error_msg);
-                throw runtime_error(error_msg);
+    virtual void add_book(const Book& book) {
+        for (const auto& b : books) {
+            if (b == book) {
+                throw runtime_error("Book already exists: " + book.get_title());
             }
         }
         books.push_back(book);
-        logger.log(LogLevel::INFO, "Book added: " + book.get_title());
+    }
+
+    virtual bool has_book(const string& title) const {
+        return find_if(books.begin(), books.end(),
+                       [&title](const Book& b) { return b.get_title() == title; }) != books.end();
+    }
+
+    virtual Book* find_book(const string& title) {
+        auto it = find_if(books.begin(), books.end(),
+                          [&title](const Book& b) { return b.get_title() == title; });
+        return (it != books.end()) ? &(*it) : nullptr;
+    }
+
+    virtual const vector<Book>& get_all_books() const {
+        return books;
+    }
+
+    virtual void remove_book(const Book& book) {
+        books.erase(
+            remove_if(books.begin(), books.end(),
+                      [&book](const Book& b) { return b == book; }),
+            books.end()
+        );
+    }
+
+    virtual vector<Book> find_by_author(const string& author) const {
+        vector<Book> result;
+        for (const auto& b : books) {
+            if (b.get_author() == author) {
+                result.push_back(b);
+            }
+        }
+        return result;
+    }
+};
+
+// ==================== СЕРВИС БИБЛИОТЕКИ ====================
+class LibraryService {
+private:
+    shared_ptr<BookRepository> repository;
+    shared_ptr<LoggerInterface> logger;
+
+public:
+    LibraryService(shared_ptr<BookRepository> repo, shared_ptr<LoggerInterface> log)
+        : repository(move(repo)), logger(move(log)) {
+        logger->log(LogLevel::INFO, "LibraryService initialized");
+    }
+
+    void add_book(const Book& book) {
+        try {
+            repository->add_book(book);
+            logger->log(LogLevel::INFO, "Book added: " + book.get_title());
+        } catch (const exception& e) {
+            logger->log(LogLevel::ERROR, "Failed to add book: " + string(e.what()));
+            throw;
+        }
     }
 
     void borrow_book(const string& title) {
-        for(auto& elem : books) {
-            if(elem.get_title() == title) {
-                if(!elem.get_is_borrowed()) {
-                    elem.borrow();
-                    logger.log(LogLevel::INFO, "Book '" + title + "' borrowed");
-                    return;
-                }
-                string error_msg = "Book '" + title + "' is already borrowed";
-                logger.log(LogLevel::ERROR, error_msg);
-                throw runtime_error(error_msg);
-            }
+        Book* book = repository->find_book(title);
+        if (!book) {
+            string msg = "Book not found: " + title;
+            logger->log(LogLevel::ERROR, msg);
+            throw runtime_error(msg);
         }
-        string error_msg = "Book '" + title + "' not found";
-        logger.log(LogLevel::ERROR, error_msg);
-        throw runtime_error(error_msg);
+        if (book->is_borrowed_status()) {
+            string msg = "Book already borrowed: " + title;
+            logger->log(LogLevel::ERROR, msg);
+            throw runtime_error(msg);
+        }
+        book->borrow();
+        logger->log(LogLevel::INFO, "Book borrowed: " + title);
     }
 
     void return_book(const string& title) {
-        for(auto& elem : books) {
-            if(elem.get_title() == title) {
-                if(elem.get_is_borrowed()) {
-                    elem.return_book();
-                    logger.log(LogLevel::INFO, "Book '" + title + "' returned");
-                    return;
-                }
-                string error_msg = "Book '" + title + "' was not borrowed";
-                logger.log(LogLevel::WARNING, error_msg);
-                throw runtime_error(error_msg);
-            }
+        Book* book = repository->find_book(title);
+        if (!book) {
+            string msg = "Book not found: " + title;
+            logger->log(LogLevel::ERROR, msg);
+            throw runtime_error(msg);
         }
-        string error_msg = "Book '" + title + "' not found";
-        logger.log(LogLevel::ERROR, error_msg);
-        throw runtime_error(error_msg);
+        if (!book->is_borrowed_status()) {
+            string msg = "Book was not borrowed: " + title;
+            logger->log(LogLevel::WARNING, msg);
+        } else {
+            book->return_book();
+            logger->log(LogLevel::INFO, "Book returned: " + title);
+        }
     }
 
-    void print_books() const {
-        if(books.empty()) {
-            cout << "The library has no books yet." << endl;
-            // можно менять в const мутодах просто, без const_cast
-            logger.log(LogLevel::INFO, "Displayed empty book list");
-            return;
+    void remove_book(const string& title) {
+        Book* book = repository->find_book(title);
+        if (!book) {
+            string msg = "Book not found: " + title;
+            logger->log(LogLevel::ERROR, msg);
+            throw runtime_error(msg);
         }
-        
-        cout << "List of books in the library (" << books.size() << "):" << endl;
-        for(const auto& elem : books) {
-            cout << "++===++ " << elem.get_title() << " (" << elem.get_author() 
-                 << ", " << elem.get_year() << ") - " << elem.get_status() << endl;
+        if (book->is_borrowed_status()) {
+            string msg = "Cannot remove borrowed book: " + title;
+            logger->log(LogLevel::ERROR, msg);
+            throw runtime_error(msg);
         }
-        
-        logger.log(LogLevel::INFO, "Displayed list of " + to_string(books.size()) + " books");
+        repository->remove_book(*book);
+        logger->log(LogLevel::INFO, "Book removed: " + title);
     }
 
     vector<Book> find_by_author(const string& author) const {
-        vector<Book> result;
-        for(const auto& elem : books) {
-            if(elem.get_author() == author) {
-                result.push_back(elem);
-            }
-        }
-        logger.log(LogLevel::INFO, 
-            "Found " + to_string(result.size()) + " books by author '" + author + "'");
+        auto result = repository->find_by_author(author);
+        logger->log(LogLevel::INFO, "Found " + to_string(result.size()) + " books by author '" + author + "'");
         return result;
     }
 
-    void remove_book(const string& title, const string& author) {
-        for(auto it = books.begin(); it != books.end(); ++it) {
-            if(it->get_title() == title && it->get_author() == author) {
-                if(it->get_is_borrowed()) {
-                    string error_msg = "Cannot delete borrowed book '" + title + "'";
-                    logger.log(LogLevel::ERROR, error_msg);
-                    throw runtime_error(error_msg);
-                }
-                books.erase(it);
-                logger.log(LogLevel::INFO, "Book '" + title + "' deleted");
-                return;
-            }
+    const vector<Book>& get_all_books() const {
+        return repository->get_all_books();
+    }
+
+    size_t get_total_books() const {
+        return repository->get_all_books().size();
+    }
+
+    size_t get_borrowed_count() const {
+        size_t count = 0;
+        for (const auto& book : repository->get_all_books()) {
+            if (book.is_borrowed_status()) count++;
         }
-        string error_msg = "Book '" + title + "' not found";
-        logger.log(LogLevel::ERROR, error_msg);
-        throw runtime_error(error_msg);
+        return count;
+    }
+};
+
+// ==================== ИНТЕРФЕЙС ОТОБРАЖЕНИЯ ====================
+class DisplayInterface {
+public:
+    virtual ~DisplayInterface() = default;
+    virtual void show_message(const string& msg) = 0;
+    virtual void show_books(const vector<Book>& books) = 0;
+    virtual void show_stats(size_t total, size_t borrowed) = 0;
+};
+
+// ==================== ОТОБРАЖЕНИЕ В КОНСОЛИ ====================
+class ConsoleDisplay : public DisplayInterface {
+public:
+    void show_message(const string& msg) override {
+        cout << msg << endl;
+    }
+
+    void show_books(const vector<Book>& books) override {
+        if (books.empty()) {
+            cout << "The library has no books yet." << endl;
+            return;
+        }
+        cout << "List of books in the library (" << books.size() << "):" << endl;
+        for (const auto& book : books) {
+            cout << "++===++ " << book.get_title() << " ("
+                 << book.get_author() << ", " << book.get_year()
+                 << ") - " << book.get_status() << endl;
+        }
+    }
+
+    void show_stats(size_t total, size_t borrowed) override {
+        cout << "\nLibrary Statistics:" << endl;
+        cout << "++===++ Total books: " << total << endl;
+        cout << "++===++ Borrowed books: " << borrowed << endl;
+        cout << "++===++ Available books: " << (total - borrowed) << endl;
+    }
+};
+
+// ==================== СЕРВИС ОТЧЁТОВ ====================
+class ReportService {
+private:
+    shared_ptr<LibraryService> service;
+    shared_ptr<DisplayInterface> display;
+    shared_ptr<LoggerInterface> logger;
+
+public:
+    ReportService(shared_ptr<LibraryService> svc,
+                  shared_ptr<DisplayInterface> disp,
+                  shared_ptr<LoggerInterface> log)
+        : service(move(svc)), display(move(disp)), logger(move(log)) {}
+
+    void print_books() const {
+        const auto& books = service->get_all_books();
+        display->show_books(books);
+        logger->log(LogLevel::INFO, "Displayed " + to_string(books.size()) + " books");
     }
 
     void print_stats() const {
-        cout << "\nLibrary Statistics:" << endl;
-        cout << "++===++ Total books: " << books.size() << endl;
-        
-        int borrowed = 0;
-        for(const auto& book : books) {
-            if(book.get_is_borrowed()) borrowed++;
-        }
-        cout << "++===++ Borrowed books: " << borrowed << endl;
-        cout << "++===++ Available books: " << books.size() - borrowed << endl;
-        
-        logger.log(LogLevel::INFO, 
-            "Statistics: Total=" + to_string(books.size()) + 
-            ", Borrowed=" + to_string(borrowed) + 
-            ", Available=" + to_string(books.size() - borrowed));
+        size_t total = service->get_total_books();
+        size_t borrowed = service->get_borrowed_count();
+        display->show_stats(total, borrowed);
+        logger->log(LogLevel::INFO, "Stats: Total=" + to_string(total) + ", Borrowed=" + to_string(borrowed));
     }
 };
 
 // ==================== ТЕСТЫ ====================
 void run_tests() {
     cout << "\n=== НАЧАЛО ТЕСТИРОВАНИЯ ===\n";
-    
-    // Тест 1: Создание книги
+
+    auto logger = make_shared<ConsoleLogger>();
+    auto repo = make_shared<BookRepository>();
+    auto service = make_shared<LibraryService>(repo, logger);
+    auto display = make_shared<ConsoleDisplay>();
+    auto reporter = make_shared<ReportService>(service, display, logger);
+
+    // Тест 1: Добавление книги
     Book book("Test Book", "Test Author", 2023);
-    cout << "Тест 1: " << (book.get_title() == "Test Book" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
-    
-    // Тест 2: Статус книги
-    cout << "Тест 2: " << (book.get_status() == "available" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
-    
-    // Тест 3: Взятие книги
-    book.borrow();
-    cout << "Тест 3: " << (book.get_status() == "borrowed" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
-    
-    // Тест 4: Возврат книги
-    book.return_book();
-    cout << "Тест 4: " << (book.get_status() == "available" ? "ПРОЙДЕН" : "НЕ ПРОЙДЕН") << endl;
-    
-    // Тест 5: Добавление книги в библиотеку
-    Library lib;
     try {
-        lib.add_book(book);
-        cout << "Тест 5: ПРОЙДЕН (книга добавлена)" << endl;
+        service->add_book(book);
+        cout << "Тест 1: ПРОЙДЕН (книга добавлена)" << endl;
     } catch (...) {
-        cout << "Тест 5: НЕ ПРОЙДЕН (не удалось добавить книгу)" << endl;
+        cout << "Тест 1: НЕ ПРОЙДЕН" << endl;
     }
-    
-    // Тест 6: Попытка добавить дубликат
+
+    // Тест 2: Дубликат
     try {
-        lib.add_book(book);
-        cout << "Тест 6: НЕ ПРОЙДЕН (дубликат добавлен)" << endl;
-    } catch (const exception& e) {
-        cout << "Тест 6: ПРОЙДЕН (" << e.what() << ")" << endl;
+        service->add_book(book);
+        cout << "Тест 2: НЕ ПРОЙДЕН (дубликат добавлен)" << endl;
+    } catch (const exception&) {
+        cout << "Тест 2: ПРОЙДЕН (дубликат отклонён)" << endl;
     }
-    
+
+    // Тест 3: Взятие книги
+    try {
+        service->borrow_book("Test Book");
+        cout << "Тест 3: ПРОЙДЕН (книга взята)" << endl;
+    } catch (...) {
+        cout << "Тест 3: НЕ ПРОЙДЕН" << endl;
+    }
+
+    // Тест 4: Возврат
+    try {
+        service->return_book("Test Book");
+        cout << "Тест 4: ПРОЙДЕН (книга возвращена)" << endl;
+    } catch (...) {
+        cout << "Тест 4: НЕ ПРОЙДЕН" << endl;
+    }
+
+    // Тест 5: Статистика
+    reporter->print_stats();
+    cout << "Тест 5: ПРОЙДЕН (статистика выведена)" << endl;
+
     cout << "=== ТЕСТИРОВАНИЕ ЗАВЕРШЕНО ===\n\n";
 }
 
+// ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
 int main() {
-    run_tests();  // Сначала запускаем тесты
-    
+    run_tests();
+
     try {
-        // Затем основной код программы
-        Library lib;
-        
-        lib.add_book(Book("1984", "Orwell", 1949));
-        lib.add_book(Book("Animal Farm", "Orwell", 1945));
-        
-        lib.print_books();
-        
+        // Логгер: в файл и в консоль
+        auto file_logger = make_shared<FileLogger>("library.log");
+        auto console_logger = make_shared<ConsoleLogger>();
+        auto multi_logger = make_shared<MultiLogger>();
+        multi_logger->add_logger(file_logger);
+        multi_logger->add_logger(console_logger);
+
+        auto repo = make_shared<BookRepository>();
+        auto service = make_shared<LibraryService>(repo, multi_logger);
+        auto display = make_shared<ConsoleDisplay>();
+        auto reporter = make_shared<ReportService>(service, display, multi_logger);
+
+        // Добавляем книги
+        service->add_book(Book("1984", "Orwell", 1949));
+        service->add_book(Book("Animal Farm", "Orwell", 1945));
+
+        // Показываем список
+        reporter->print_books();
+
+        // Показываем статистику
+        reporter->print_stats();
+
+        // Берём книгу
+        service->borrow_book("1984");
+
+        // Снова статистика
+        reporter->print_stats();
+
     } catch (const exception& e) {
         cerr << "Ошибка: " << e.what() << endl;
         return 1;
     }
-    
+
     return 0;
 }
