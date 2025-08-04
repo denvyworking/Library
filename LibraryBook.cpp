@@ -34,7 +34,7 @@ public:
 class LoggerInterface {
 public:
     virtual ~LoggerInterface() = default;
-    virtual void log(LogLevel level, const string& message) = 0;
+    virtual void log(LogLevel level, const string& message) const = 0;
 };
 
 // ================ ЛОГГЕР В ФАЙЛ ================
@@ -58,11 +58,11 @@ public:
         }
     }
 
-    void log(LogLevel level, const string& message) override {
+    void log(LogLevel level, const string& message) const override{
         string level_str;
         switch(level) {
             case LogLevel::INFO:    level_str = "INFO";    break;
-            case LogLevel::WARNING:    level_str = "WARNING"; break;
+            case LogLevel::WARNING:    level_str = "WARNING";    break;
             case LogLevel::ERROR:   level_str = "ERROR";   break;
         }
 
@@ -74,7 +74,7 @@ public:
 // ================== ЛОГГЕР В КОНСОЛЬ ===================
 class ConsoleLogger : public LoggerInterface {
 public:
-    void log(LogLevel level, const string& message) override {
+    void log(LogLevel level, const string& message) const override {
         string level_str;
         switch(level) {
             case LogLevel::INFO:    level_str = "INFO";    break;
@@ -97,7 +97,7 @@ public:
         loggers.push_back(logger);
     }
 
-    void log(LogLevel level, const string& message) override {
+    void log(LogLevel level, const string& message) const override {
         for (const auto& logger : loggers) {
             logger->log(level, message);
         }
@@ -153,6 +153,7 @@ protected:
 
 public:
     ~BookRepository() override = default;
+
     virtual void add_book(const Book& book) {
         for (const auto& b : books) {
             if (b == book) {
@@ -167,7 +168,7 @@ public:
                        [&title](const Book& b) { return b.get_title() == title; }) != books.end();
     }
 
-    virtual Book* find_book(const string& title) {
+    virtual Book* find_book(const string& title){
         auto it = find_if(books.begin(), books.end(),
                           [&title](const Book& b) { return b.get_title() == title; });
         return (it != books.end()) ? &(*it) : nullptr;
@@ -178,7 +179,7 @@ public:
     }
 
     virtual void remove_book(const Book& book) {
-        for (auto it = books.begin(); it != books.end(); ) {
+        for (auto it = books.begin(); it != books.end();) {
             if (*it == book) {
                 it = books.erase(it);
             } else {
@@ -223,6 +224,7 @@ public:
     }
 
     void borrow_book(const string& title) {
+        // вот тут обьяснение, почему мы не можем сделать метод find_book const
         Book* book = repository->find_book(title);
         if (!book) {
             string msg = "Book not found: " + title;
@@ -419,6 +421,7 @@ int main() {
         auto file_logger = make_shared<FileLogger>("library.log");
         auto console_logger = make_shared<ConsoleLogger>();
         auto multi_logger = make_shared<MultiLogger>();
+        // теперь запись и в консоль и в файл
         multi_logger->add_logger(file_logger);
         multi_logger->add_logger(console_logger);
 
